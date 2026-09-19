@@ -341,9 +341,7 @@
     <!-- Start Screen (Instructions) -->
     <div id="start-screen" class="screen hidden">
         <h1 class="title">กติกาการเล่น 🚀</h1>
-        <div class="instruction" id="mode-instruction">
-            <!-- Instruction updated by JS -->
-        </div>
+        <div class="instruction" id="mode-instruction"></div>
         <button class="btn btn-primary" onclick="startGame()">พร้อมแล้ว... เริ่มเล่นเลย!</button>
     </div>
 
@@ -384,7 +382,6 @@
     <canvas id="output_canvas"></canvas>
 
     <script>
-        // ฐานข้อมูลคำถามทั้งหมด
         const allQuestions = [
             { type: "มากที่สุด", options: [{ num: 1, den: 5, emoji: "🍎" }, { num: 3, den: 5, emoji: "🍊" }, { num: 4, den: 5, emoji: "🍉" }], correctIndex: 2, explanation: "ตัวส่วนเท่ากัน (5) เศษส่วนที่มีตัวเศษมากกว่าจะมีค่ามากกว่า (4 มากกว่า 3 และ 1)" },
             { type: "น้อยที่สุด", options: [{ num: 2, den: 7, emoji: "🍓" }, { num: 5, den: 7, emoji: "🍇" }, { num: 6, den: 7, emoji: "🍎" }], correctIndex: 0, explanation: "ตัวส่วนเท่ากัน (7) เศษส่วนที่มีตัวเศษน้อยกว่าจะมีค่าน้อยกว่า (2 น้อยกว่า 5 และ 6)" },
@@ -400,16 +397,15 @@
             { type: "น้อยที่สุด", options: [{ num: 2, den: 5, emoji: "🍇" }, { num: 2, den: 7, emoji: "🍓" }, { num: 2, den: 3, emoji: "🍉" }], correctIndex: 1, explanation: "ตัวเศษเท่ากัน (2) ยิ่งตัวส่วนมีค่ามาก (7) ชิ้นที่แบ่งจะยิ่งเล็กที่สุด" }
         ];
 
-        let playMode = ''; // 'camera' or 'touch'
+        let playMode = ''; 
         let activeQuestions = [];
         let currentQuestionIndex = 0;
         let score = 0;
-        let gameState = 'INIT'; // INIT, PLAYING, FEEDBACK, END
+        let gameState = 'INIT'; 
         let fruitTargets = [];
         let touchCooldown = false;
         let feedbackTimer = null;
 
-        // Holding timer for camera mode
         let currentHoverIndex = -1;
         let hoverStartTime = 0;
         const HOLD_DURATION = 1500;
@@ -417,16 +413,14 @@
         let touchLoopId = null;
         let handsCamera = null;
         let soundEnabled = false;
-        let isLineApp = false; // ตัวแปรตรวจสอบว่าเป็น In-App Browser ของ LINE หรือไม่
+        let isLineApp = false;
 
         async function initSound() {
             if (!soundEnabled && typeof Tone !== 'undefined') {
                 try {
                     await Tone.start();
                     soundEnabled = true;
-                } catch(e) {
-                    console.warn("ระบบเสียงไม่อนุญาต:", e);
-                }
+                } catch(e) {}
             }
         }
 
@@ -459,12 +453,9 @@
         function selectMode(mode) {
             initSound();
             playMode = mode;
-            
-            // ตรวจสอบว่าเป็น LINE Browser หรือไม่ เพื่อปรับทิศทางกล้องอัตโนมัติ
             isLineApp = /Line/i.test(navigator.userAgent);
 
             document.getElementById('mode-screen').classList.add('hidden');
-            
             if (mode === 'camera') {
                 initCameraMode();
             } else {
@@ -489,7 +480,6 @@
 
         function initCameraMode() {
             document.getElementById('loading-overlay').classList.remove('hidden');
-            
             document.getElementById('mode-instruction').innerHTML = `
                 <strong>วิธีเล่น (โหมดกล้อง):</strong><br>
                 1. อ่านโจทย์ด้านบน (หาเศษส่วนที่ <b>มากที่สุด</b> หรือ <b>น้อยที่สุด</b>)<br>
@@ -498,7 +488,6 @@
             `;
 
             if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
-                console.warn("MediaPipe libraries not available.");
                 document.getElementById('error-box').classList.remove('hidden');
                 return;
             }
@@ -531,11 +520,9 @@
                     document.getElementById('loading-overlay').classList.add('hidden');
                     document.getElementById('start-screen').classList.remove('hidden');
                 }).catch(err => {
-                    console.error("Camera start error:", err);
                     document.getElementById('error-box').classList.remove('hidden');
                 });
             } catch(e) {
-                console.error("Hands init error:", e);
                 document.getElementById('error-box').classList.remove('hidden');
             }
         }
@@ -560,7 +547,6 @@
 
         function startGame() {
             activeQuestions = shuffleArray(allQuestions).slice(0, 10);
-            
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('game-ui').classList.remove('hidden');
             
@@ -569,7 +555,6 @@
             
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
-            
             canvasElement.style.pointerEvents = playMode === 'touch' ? 'auto' : 'none';
             
             if (playMode === 'touch') {
@@ -593,7 +578,6 @@
             let q = activeQuestions[currentQuestionIndex];
             document.getElementById('question-bar').innerHTML = `หยิบผลไม้ที่มีเศษส่วน <b><span style="color:#F44336; font-size:2.2rem;">${q.type}</span></b>`;
             document.getElementById('score-bar').innerText = `ข้อ: ${currentQuestionIndex + 1}/10 | คะแนน: ${score}`;
-            
             calculateFruitPositions();
         }
 
@@ -637,7 +621,6 @@
             function loop() {
                 if(playMode === 'touch' && (gameState === 'PLAYING' || gameState === 'FEEDBACK')) {
                     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
                     if (gameState === 'PLAYING') {
                         drawFruits();
                     }
@@ -651,17 +634,16 @@
         function onCameraResults(results) {
             if (playMode !== 'camera') return;
 
-            canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            
-            // ถ้าเปิดใน LINE ภาพจะไม่ต้องสลับกระจก แต่ถ้าเปิด Safari ปกติจะสลับ
-            if (!isLineApp) {
-                canvasCtx.scale(-1, 1);
-                canvasCtx.translate(-canvasElement.width, 0);
-            }
-            
+
+            // 1. วาดเฉพาะภาพวิดีโอพื้นหลัง (Mirrored เพื่อให้เหมือนกระจกเงา)
+            canvasCtx.save();
+            canvasCtx.scale(-1, 1);
+            canvasCtx.translate(-canvasElement.width, 0);
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-            
+            canvasCtx.restore(); // คืนค่า Matrix เป็นปกติทันที เพื่อไม่ให้ข้อความกลับด้าน
+
+            // 2. วาดผลไม้และข้อความ (ตั้งตรงปกติ ไม่ถูกพลิก)
             if (gameState === 'PLAYING') {
                 drawFruits();
                 
@@ -669,8 +651,8 @@
                     const landmarks = results.multiHandLandmarks[0];
                     const indexFinger = landmarks[8];
                     
-                    // ปรับพิกัดนิ้วตามแอปพลิเคชัน (LINE กับ Safari สลับทิศทางกัน)
-                    let fingerX = isLineApp ? indexFinger.x * canvasElement.width : (1 - indexFinger.x) * canvasElement.width;
+                    // ปรับคำนวณพิกัดนิ้วให้ตรงกับหน้าจอที่สะท้อนกระจก
+                    let fingerX = (1 - indexFinger.x) * canvasElement.width;
                     const fingerY = indexFinger.y * canvasElement.height;
 
                     canvasCtx.beginPath();
@@ -713,7 +695,6 @@
                     currentHoverIndex = -1;
                 }
             }
-            canvasCtx.restore();
         }
 
         function drawFruits() {
@@ -723,7 +704,6 @@
             fruitTargets.forEach(target => {
                 let opt = q.options[target.index];
                 
-                // พื้นหลังผลไม้
                 canvasCtx.beginPath();
                 canvasCtx.arc(target.x, target.y, target.r, 0, 2 * Math.PI);
                 canvasCtx.fillStyle = "rgba(255, 255, 255, 0.95)";
@@ -732,7 +712,6 @@
                 canvasCtx.shadowBlur = 15;
                 canvasCtx.shadowOffsetX = 0;
                 canvasCtx.shadowOffsetY = 8;
-                
                 canvasCtx.fill();
                 
                 canvasCtx.shadowColor = "transparent";
@@ -746,7 +725,6 @@
                 if (currentHoverIndex === target.index && playMode === 'camera') {
                     canvasCtx.strokeStyle = "var(--primary)";
                 }
-                
                 canvasCtx.stroke();
                 
                 // Emoji
@@ -755,10 +733,9 @@
                 canvasCtx.textBaseline = "middle";
                 canvasCtx.fillText(opt.emoji, target.x, target.y - target.r * 0.25);
                 
-                // เศษส่วน
+                // เศษส่วน (ตัวเลขจะตั้งตรง อ่านง่าย ไม่กลับด้านแน่นอน)
                 canvasCtx.fillStyle = "#333";
                 canvasCtx.font = `bold ${target.r * 0.45}px Mali`;
-                
                 canvasCtx.fillText(opt.num, target.x + target.r * 0.35, target.y - target.r * 0.15);
                 canvasCtx.fillRect(target.x + target.r * 0.1, target.y + target.r * 0.08, target.r * 0.5, 4);
                 canvasCtx.fillText(opt.den, target.x + target.r * 0.35, target.y + target.r * 0.38);
@@ -791,7 +768,6 @@
 
             let q = activeQuestions[currentQuestionIndex];
             let isCorrect = (selectedIndex === q.correctIndex);
-            
             if (isCorrect) score++;
 
             const fbStatus = document.getElementById('fb-status');
@@ -857,7 +833,6 @@
             startGame();
         }
 
-        // ผูกฟังก์ชันเข้ากับ Global Scope
         window.selectMode = selectMode;
         window.forceTouchMode = forceTouchMode;
         window.startGame = startGame;
