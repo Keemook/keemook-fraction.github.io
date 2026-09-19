@@ -417,6 +417,7 @@
         let touchLoopId = null;
         let handsCamera = null;
         let soundEnabled = false;
+        let isLineApp = false; // ตัวแปรตรวจสอบว่าเป็น In-App Browser ของ LINE หรือไม่
 
         async function initSound() {
             if (!soundEnabled && typeof Tone !== 'undefined') {
@@ -458,6 +459,10 @@
         function selectMode(mode) {
             initSound();
             playMode = mode;
+            
+            // ตรวจสอบว่าเป็น LINE Browser หรือไม่ เพื่อปรับทิศทางกล้องอัตโนมัติ
+            isLineApp = /Line/i.test(navigator.userAgent);
+
             document.getElementById('mode-screen').classList.add('hidden');
             
             if (mode === 'camera') {
@@ -649,9 +654,11 @@
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             
-            // --- แก้ไขจุดนี้: พลิก Canvas กลับด้าน (Mirror) เพื่อให้กล้องไม่สลับซ้ายขวา ---
-            canvasCtx.scale(-1, 1);
-            canvasCtx.translate(-canvasElement.width, 0);
+            // ถ้าเปิดใน LINE ภาพจะไม่ต้องสลับกระจก แต่ถ้าเปิด Safari ปกติจะสลับ
+            if (!isLineApp) {
+                canvasCtx.scale(-1, 1);
+                canvasCtx.translate(-canvasElement.width, 0);
+            }
             
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
             
@@ -662,8 +669,8 @@
                     const landmarks = results.multiHandLandmarks[0];
                     const indexFinger = landmarks[8];
                     
-                    // --- แก้ไขจุดนี้: พลิกพิกัด X ของนิ้วมือให้ตรงกับภาพที่ถูกสะท้อน ---
-                    const fingerX = (1 - indexFinger.x) * canvasElement.width;
+                    // ปรับพิกัดนิ้วตามแอปพลิเคชัน (LINE กับ Safari สลับทิศทางกัน)
+                    let fingerX = isLineApp ? indexFinger.x * canvasElement.width : (1 - indexFinger.x) * canvasElement.width;
                     const fingerY = indexFinger.y * canvasElement.height;
 
                     canvasCtx.beginPath();
@@ -850,7 +857,7 @@
             startGame();
         }
 
-        // ผูกฟังก์ชันเข้ากับ Global Scope เพื่อความชัวร์ 100%
+        // ผูกฟังก์ชันเข้ากับ Global Scope
         window.selectMode = selectMode;
         window.forceTouchMode = forceTouchMode;
         window.startGame = startGame;
