@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>เกมเก็บผลไม้เศษส่วน ป.3</title>
+    
+    <!-- นำเข้าฟอนต์ภาษาไทย -->
+    <link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- นำเข้าไลบรารี MediaPipe สำหรับจับการเคลื่อนไหวมือ -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <!-- นำเข้าไลบรารี Tone.js สำหรับสังเคราะห์เสียงประกอบ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <style>
+        :root {
+            --primary: #4CAF50;
+            --secondary: #FF9800;
+            --danger: #F44336;
+            --info: #2196F3;
+            --bg-color: #E8F5E9;
+            --font-main: 'Mali', cursive;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: var(--font-main);
+            background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        /* พื้นหลังน่ารัก (ท้องฟ้า เมฆ เนินหญ้า) */
+        .scenery {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        
+        .sun {
+            position: absolute; top: 5%; right: 10%; font-size: 80px;
+            animation: pulseSun 3s infinite alternate;
+            filter: drop-shadow(0 0 15px rgba(255, 235, 59, 0.8));
+        }
+        
+        .cloud {
+            position: absolute; background: white; border-radius: 100px;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.05); 
+            animation: floatCloud linear infinite;
+        }
+        .cloud::before, .cloud::after {
+            content: ''; position: absolute; background: white; border-radius: 50%;
+        }
+        .cloud1 { width: 160px; height: 60px; top: 15%; left: -200px; animation-duration: 35s; }
+        .cloud1::before { width: 80px; height: 80px; top: -40px; left: 20px; }
+        .cloud1::after { width: 60px; height: 60px; top: -20px; right: 20px; }
+        
+        .cloud2 { width: 120px; height: 40px; top: 30%; left: -150px; animation-duration: 25s; opacity: 0.8; }
+        .cloud2::before { width: 60px; height: 60px; top: -30px; left: 15px; }
+        .cloud2::after { width: 40px; height: 40px; top: -15px; right: 15px; }
+
+        .grass {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 15vh;
+            background: linear-gradient(to top, #7cb342, #aed581);
+            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+            box-shadow: inset 0 10px 20px rgba(255,255,255,0.3);
+        }
+
+        @keyframes pulseSun { 
+            0% { transform: scale(1) rotate(-5deg); } 
+            100% { transform: scale(1.1) rotate(5deg); } 
+        }
+        @keyframes floatCloud { 
+            0% { transform: translateX(0); } 
+            100% { transform: translateX(150vw); } 
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(8px);
+            z-index: 10;
+            transition: opacity 0.3s ease;
+            padding: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .title {
+            font-size: 2.8rem;
+            color: var(--primary);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.15);
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .instruction {
+            font-size: 1.4rem;
+            color: #333;
+            background: #fff;
+            padding: 20px 25px;
+            border-radius: 20px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 90%;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .btn {
+            font-family: var(--font-main);
+            font-size: 1.6rem;
+            padding: 14px 28px;
+            margin: 10px;
+            border: none;
+            border-radius: 30px;
+            background-color: var(--secondary);
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #E65100;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.05);
+        }
+        
+        .btn-primary { 
+            background-color: var(--primary); 
+            box-shadow: 0 6px 0 #2E7D32; 
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #E65100;
+        }
+
+        .btn-primary:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #2E7D32;
+        }
+
+        #game-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+            z-index: 5;
+        }
+
+        #question-bar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 28px;
+            border-radius: 25px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2e7d32;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+            text-align: center;
+            white-space: nowrap;
+            border: 3px solid #a5d6a7;
+        }
+
+        #score-bar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--info);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 18px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        #feedback-screen {
+            background: rgba(0, 0, 0, 0.75);
+            color: white;
+            z-index: 20;
+        }
+
+        .feedback-box {
+            background: white;
+            color: #333;
+            padding: 30px;
+            border-radius: 25px;
+            text-align: center;
+            max-width: 550px;
+            width: 90%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .feedback-status {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .feedback-correct { color: var(--primary); }
+        .feedback-wrong { color: var(--danger); }
+        .feedback-exp { font-size: 1.4rem; margin-bottom: 20px; color: #444; line-height: 1.5; }
+
+        .timer-bar-container {
+            width: 100%;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .timer-bar {
+            height: 100%;
+            background: var(--secondary);
+            width: 100%;
+            transition: width 5s linear;
+        }
+
+        #output_canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 2;
+            cursor: pointer;
+        }
+        
+        #videoElement { display: none; }
+
+        @keyframes popIn {
+            0% { transform: scale(0.6); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        #loading-overlay { background: var(--bg-color); z-index: 100; }
+        .loader {
+            border: 8px solid #e0e0e0;
+            border-top: 8px solid var(--primary);
+            border-radius: 50%;
+            width: 70px;
+            height: 70px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #error-box {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px 20px;
+            border-radius: 15px;
+            margin-top: 15px;
+            text-align: center;
+            border: 2px solid #ef9a9a;
+        }
+
+        @media (max-width: 768px) {
+            .title { font-size: 2rem; }
+            .instruction { font-size: 1.1rem; padding: 15px; }
+            #question-bar { font-size: 1.1rem; top: 12px; padding: 8px 16px; }
+            #score-bar { font-size: 0.95rem; top: 12px; right: 12px; padding: 6px 12px; }
+            .btn { font-size: 1.25rem; padding: 10px 20px; }
+            .feedback-box { padding: 20px; }
+            .feedback-status { font-size: 2.2rem; }
+            .feedback-exp { font-size: 1.1rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- พื้นหลังน่ารัก -->
+    <div class="scenery">
+        <div class="sun">☀️</div>
+        <div class="cloud cloud1"></div>
+        <div class="cloud cloud2"></div>
+        <div class="grass"></div>
+    </div>
+
+    <!-- Mode Selection Screen -->
+    <div id="mode-screen" class="screen">
+        <h1 class="title">🍎 เกมเก็บผลไม้เศษส่วน 🍊</h1>
+        <div class="instruction">
+            <strong>ยินดีต้อนรับสู่เกมคณิตศาสตร์ ป.3!</strong><br>
+            กรุณาเลือกโหมดการเล่นที่ต้องการด้านล่าง:
+        </div>
+        <button id="btn-mode-camera" class="btn btn-primary" onclick="selectMode('camera')">📷 เล่นแบบใช้กล้อง (ขยับมือเลือก)</button>
+        <button id="btn-mode-touch" class="btn" onclick="selectMode('touch')">👆 เล่นแบบกดหน้าจอ (ไม่ใช้กล้อง)</button>
+    </div>
+
+    <!-- Loading Screen (For Camera) -->
+    <div id="loading-overlay" class="screen hidden">
+        <div class="loader"></div>
+        <h2 style="color: var(--primary); text-align: center; margin: 0;">กำลังเปิดกล้องและระบบจับมือ...<br><span style="font-size:1.1rem; color:#666;">กรุณารอสักครู่</span></h2>
+        <div id="error-box" class="hidden">
+            <p style="margin: 0 0 10px 0;">ไม่สามารถเชื่อมต่อกล้องได้ (อาจถูกบล็อกสิทธิ์หรือไม่อนุญาต)</p>
+            <button class="btn btn-primary" style="font-size: 1.1rem;" onclick="forceTouchMode()">เปลี่ยนไปเล่นโหมดกดหน้าจอแทน ➔</button>
+        </div>
+    </div>
+
+    <!-- Start Screen (Instructions) -->
+    <div id="start-screen" class="screen hidden">
+        <h1 class="title">กติกาการเล่น 🚀</h1>
+        <div class="instruction" id="mode-instruction">
+            <!-- Instruction updated by JS -->
+        </div>
+        <button class="btn btn-primary" onclick="startGame()">พร้อมแล้ว... เริ่มเล่นเลย!</button>
+    </div>
+
+    <!-- Game Elements -->
+    <div id="game-ui" class="hidden">
+        <div id="question-bar">เลือกผลไม้ที่มีเศษส่วน...</div>
+        <div id="score-bar">ข้อ: 1/10 | คะแนน: 0</div>
+    </div>
+
+    <!-- Feedback Screen -->
+    <div id="feedback-screen" class="screen hidden">
+        <div class="feedback-box">
+            <div id="fb-status" class="feedback-status">ถูกต้อง! 🌟</div>
+            <div id="fb-exp" class="feedback-exp">อธิบายคำตอบ...</div>
+            <div class="timer-bar-container">
+                <div id="timer-bar" class="timer-bar"></div>
+            </div>
+            <button class="btn btn-primary" style="margin-top:0;" onclick="nextQuestion()">ข้อต่อไป ➔</button>
+        </div>
+    </div>
+
+    <!-- End Screen -->
+    <div id="end-screen" class="screen hidden">
+        <h1 class="title">สรุปผลคะแนน 🏆</h1>
+        <div class="instruction">
+            <h2 id="final-score" style="font-size:3rem; color:var(--primary); margin:10px 0 0 0;">8 / 10</h2>
+            <h3 id="final-percent" style="color:var(--secondary); margin:5px 0 15px 0;">คิดเป็นร้อยละ 80</h3>
+            <p id="final-message" style="margin:0; font-size:1.2rem;">เก่งมาก! หนูเข้าใจเรื่องเศษส่วนได้ดีเยี่ยม</p>
+        </div>
+        <div>
+            <button class="btn btn-primary" onclick="resetGame()">เล่นใหม่อีกครั้ง 🔄</button>
+            <button class="btn" onclick="backToModeSelect()" style="background-color: #757575; box-shadow: 0 6px 0 #424242;">สลับโหมดการเล่น</button>
+        </div>
+    </div>
+
+    <!-- Video and Canvas -->
+    <video id="videoElement" playsinline></video>
+    <canvas id="output_canvas"></canvas>
+
+    <script>
+        // ฐานข้อมูลคำถามทั้งหมด
+        const allQuestions = [
+            { type: "มากที่สุด", options: [{ num: 1, den: 5, emoji: "🍎" }, { num: 3, den: 5, emoji: "🍊" }, { num: 4, den: 5, emoji: "🍉" }], correctIndex: 2, explanation: "ตัวส่วนเท่ากัน (5) เศษส่วนที่มีตัวเศษมากกว่าจะมีค่ามากกว่า (4 มากกว่า 3 และ 1)" },
+            { type: "น้อยที่สุด", options: [{ num: 2, den: 7, emoji: "🍓" }, { num: 5, den: 7, emoji: "🍇" }, { num: 6, den: 7, emoji: "🍎" }], correctIndex: 0, explanation: "ตัวส่วนเท่ากัน (7) เศษส่วนที่มีตัวเศษน้อยกว่าจะมีค่าน้อยกว่า (2 น้อยกว่า 5 และ 6)" },
+            { type: "มากที่สุด", options: [{ num: 1, den: 8, emoji: "🍉" }, { num: 1, den: 4, emoji: "🍓" }, { num: 1, den: 2, emoji: "🍊" }], correctIndex: 2, explanation: "ตัวเศษเท่ากัน (1) ตัวส่วนน้อยกว่า แสดงว่าถูกแบ่งน้อยชิ้น ชิ้นจึงใหญ่กว่า (1/2 มากที่สุด)" },
+            { type: "น้อยที่สุด", options: [{ num: 3, den: 4, emoji: "🍇" }, { num: 3, den: 5, emoji: "🍎" }, { num: 3, den: 8, emoji: "🍉" }], correctIndex: 2, explanation: "ตัวเศษเท่ากัน (3) ตัวส่วนยิ่งมาก ชิ้นยิ่งเล็กลง (3/8 น้อยที่สุด)" },
+            { type: "มากที่สุด", options: [{ num: 4, den: 9, emoji: "🍊" }, { num: 7, den: 9, emoji: "🍓" }, { num: 2, den: 9, emoji: "🍇" }], correctIndex: 1, explanation: "ตัวส่วนเท่ากัน ให้ดูที่ตัวเศษ 7 มากที่สุด ดังนั้น 7/9 มากที่สุด" },
+            { type: "น้อยที่สุด", options: [{ num: 8, den: 10, emoji: "🍉" }, { num: 3, den: 10, emoji: "🍎" }, { num: 5, den: 10, emoji: "🍊" }], correctIndex: 1, explanation: "ตัวส่วนเท่ากัน ให้ดูที่ตัวเศษ 3 น้อยที่สุด ดังนั้น 3/10 น้อยที่สุด" },
+            { type: "มากที่สุด", options: [{ num: 2, den: 9, emoji: "🍓" }, { num: 2, den: 6, emoji: "🍉" }, { num: 2, den: 3, emoji: "🍇" }], correctIndex: 2, explanation: "ตัวเศษเท่ากัน แบ่ง 3 ชิ้น (ตัวส่วน 3) จะได้ชิ้นใหญ่กว่าแบ่ง 6 หรือ 9 ชิ้น" },
+            { type: "น้อยที่สุด", options: [{ num: 4, den: 5, emoji: "🍎" }, { num: 4, den: 7, emoji: "🍊" }, { num: 4, den: 10, emoji: "🍓" }], correctIndex: 2, explanation: "ตัวเศษเท่ากัน ยิ่งตัวส่วนมาก (แบ่ง 10 ชิ้น) ชิ้นจะยิ่งเล็กที่สุด" },
+            { type: "มากที่สุด", options: [{ num: 3, den: 6, emoji: "🍇" }, { num: 1, den: 6, emoji: "🍉" }, { num: 5, den: 6, emoji: "🍎" }], correctIndex: 2, explanation: "ตัวส่วนเท่ากัน (6) ตัวเศษ 5 มากที่สุด ดังนั้น 5/6 มีค่ามากที่สุด" },
+            { type: "น้อยที่สุด", options: [{ num: 5, den: 6, emoji: "🍓" }, { num: 5, den: 8, emoji: "🍊" }, { num: 5, den: 12, emoji: "🍇" }], correctIndex: 2, explanation: "ตัวเศษเท่ากัน (5) ส่วน 12 คือการแบ่งถึง 12 ชิ้น ทำให้ชิ้นเล็กที่สุด" },
+            { type: "มากที่สุด", options: [{ num: 2, den: 4, emoji: "🍉" }, { num: 3, den: 4, emoji: "🍊" }, { num: 1, den: 4, emoji: "🍎" }], correctIndex: 1, explanation: "ตัวส่วนเท่ากัน (4) ตัวเศษ 3 มากกว่า 2 และ 1 ดังนั้น 3/4 จึงมากที่สุด" },
+            { type: "น้อยที่สุด", options: [{ num: 2, den: 5, emoji: "🍇" }, { num: 2, den: 7, emoji: "🍓" }, { num: 2, den: 3, emoji: "🍉" }], correctIndex: 1, explanation: "ตัวเศษเท่ากัน (2) ยิ่งตัวส่วนมีค่ามาก (7) ชิ้นที่แบ่งจะยิ่งเล็กที่สุด" }
+        ];
+
+        let playMode = ''; // 'camera' or 'touch'
+        let activeQuestions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let gameState = 'INIT'; // INIT, PLAYING, FEEDBACK, END
+        let fruitTargets = [];
+        let touchCooldown = false;
+        let feedbackTimer = null;
+
+        // Holding timer for camera mode
+        let currentHoverIndex = -1;
+        let hoverStartTime = 0;
+        const HOLD_DURATION = 1500;
+
+        let touchLoopId = null;
+        let handsCamera = null;
+        let soundEnabled = false;
+
+        async function initSound() {
+            if (!soundEnabled && typeof Tone !== 'undefined') {
+                try {
+                    await Tone.start();
+                    soundEnabled = true;
+                } catch(e) {
+                    console.warn("ระบบเสียงไม่อนุญาต:", e);
+                }
+            }
+        }
+
+        function playCorrectSound() {
+            if (!soundEnabled || typeof Tone === 'undefined') return;
+            try {
+                const synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                synth.volume.value = -10;
+                const now = Tone.now();
+                synth.triggerAttackRelease(["C4", "E4", "G4"], "16n", now);
+                synth.triggerAttackRelease(["E4", "G4", "C5"], "8n", now + 0.15);
+            } catch(e) {}
+        }
+
+        function playWrongSound() {
+            if (!soundEnabled || typeof Tone === 'undefined') return;
+            try {
+                const synth = new Tone.Synth().toDestination();
+                synth.volume.value = -10;
+                const now = Tone.now();
+                synth.triggerAttackRelease("Eb3", "8n", now);
+                synth.triggerAttackRelease("C3", "4n", now + 0.2);
+            } catch(e) {}
+        }
+
+        const videoElement = document.getElementById('videoElement');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+
+        function selectMode(mode) {
+            initSound();
+            playMode = mode;
+            document.getElementById('mode-screen').classList.add('hidden');
+            
+            if (mode === 'camera') {
+                initCameraMode();
+            } else {
+                initTouchMode();
+            }
+        }
+
+        function forceTouchMode() {
+            initSound();
+            playMode = 'touch';
+            document.getElementById('loading-overlay').classList.add('hidden');
+            document.getElementById('error-box').classList.add('hidden');
+            initTouchMode();
+        }
+
+        function backToModeSelect() {
+            document.getElementById('end-screen').classList.add('hidden');
+            document.getElementById('game-ui').classList.add('hidden');
+            document.getElementById('mode-screen').classList.remove('hidden');
+            gameState = 'INIT';
+        }
+
+        function initCameraMode() {
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            
+            document.getElementById('mode-instruction').innerHTML = `
+                <strong>วิธีเล่น (โหมดกล้อง):</strong><br>
+                1. อ่านโจทย์ด้านบน (หาเศษส่วนที่ <b>มากที่สุด</b> หรือ <b>น้อยที่สุด</b>)<br>
+                2. ยื่นมือของคุณไป <b>ทับผลไม้ที่ถูกต้อง</b> บนหน้าจอ<br>
+                3. <span style="color:var(--danger)"><b>ค้างมือไว้ 1.5 วินาที</b></span> จนวงแหวนโหลดเต็ม เพื่อตอบคำถาม!
+            `;
+
+            if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
+                console.warn("MediaPipe libraries not available.");
+                document.getElementById('error-box').classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const hands = new Hands({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+                });
+                
+                hands.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.7,
+                    minTrackingConfidence: 0.7
+                });
+
+                hands.onResults(onCameraResults);
+
+                handsCamera = new Camera(videoElement, {
+                    onFrame: async () => {
+                        if (videoElement.readyState >= 2) {
+                            await hands.send({image: videoElement});
+                        }
+                    },
+                    width: 1280,
+                    height: 720
+                });
+
+                handsCamera.start().then(() => {
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                    document.getElementById('start-screen').classList.remove('hidden');
+                }).catch(err => {
+                    console.error("Camera start error:", err);
+                    document.getElementById('error-box').classList.remove('hidden');
+                });
+            } catch(e) {
+                console.error("Hands init error:", e);
+                document.getElementById('error-box').classList.remove('hidden');
+            }
+        }
+
+        function initTouchMode() {
+            document.getElementById('mode-instruction').innerHTML = `
+                <strong>วิธีเล่น (โหมดกดหน้าจอ):</strong><br>
+                1. อ่านโจทย์ด้านบน (หาเศษส่วนที่ <b>มากที่สุด</b> หรือ <b>น้อยที่สุด</b>)<br>
+                2. <b>ใช้นิ้วจิ้ม หรือเมาส์คลิก</b> ที่ผลไม้ที่ถูกต้องเพื่อเลือกตอบทันที!
+            `;
+            document.getElementById('start-screen').classList.remove('hidden');
+        }
+
+        function shuffleArray(array) {
+            let shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        function startGame() {
+            activeQuestions = shuffleArray(allQuestions).slice(0, 10);
+            
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+            
+            currentQuestionIndex = 0;
+            score = 0;
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            canvasElement.style.pointerEvents = playMode === 'touch' ? 'auto' : 'none';
+            
+            if (playMode === 'touch') {
+                startTouchLoop();
+            }
+
+            loadQuestion();
+        }
+
+        function resizeCanvas() {
+            canvasElement.width = window.innerWidth;
+            canvasElement.height = window.innerHeight;
+            calculateFruitPositions();
+        }
+
+        function loadQuestion() {
+            gameState = 'PLAYING';
+            touchCooldown = false;
+            currentHoverIndex = -1;
+            
+            let q = activeQuestions[currentQuestionIndex];
+            document.getElementById('question-bar').innerHTML = `หยิบผลไม้ที่มีเศษส่วน <b><span style="color:#F44336; font-size:2.2rem;">${q.type}</span></b>`;
+            document.getElementById('score-bar').innerText = `ข้อ: ${currentQuestionIndex + 1}/10 | คะแนน: ${score}`;
+            
+            calculateFruitPositions();
+        }
+
+        function calculateFruitPositions() {
+            const w = canvasElement.width;
+            const h = canvasElement.height;
+            const radius = Math.min(w, h) * 0.14; 
+
+            fruitTargets = [
+                { x: w * 0.22, y: h * 0.55, r: radius, index: 0 },
+                { x: w * 0.50, y: h * 0.55, r: radius, index: 1 },
+                { x: w * 0.78, y: h * 0.55, r: radius, index: 2 }
+            ];
+        }
+
+        function handlePointerAction(clientX, clientY) {
+            if (playMode !== 'touch' || gameState !== 'PLAYING' || touchCooldown) return;
+            
+            const rect = canvasElement.getBoundingClientRect();
+            const scaleX = canvasElement.width / rect.width;
+            const scaleY = canvasElement.height / rect.height;
+            
+            const x = (clientX - rect.left) * scaleX;
+            const y = (clientY - rect.top) * scaleY;
+            
+            for (let target of fruitTargets) {
+                let dx = x - target.x;
+                let dy = y - target.y;
+                if (Math.sqrt(dx * dx + dy * dy) <= target.r * 1.15) {
+                    handleAnswer(target.index);
+                    break;
+                }
+            }
+        }
+
+        canvasElement.addEventListener('pointerdown', (e) => {
+            handlePointerAction(e.clientX, e.clientY);
+        });
+
+        function startTouchLoop() {
+            function loop() {
+                if(playMode === 'touch' && (gameState === 'PLAYING' || gameState === 'FEEDBACK')) {
+                    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+                    if (gameState === 'PLAYING') {
+                        drawFruits();
+                    }
+                }
+                touchLoopId = requestAnimationFrame(loop);
+            }
+            if (touchLoopId) cancelAnimationFrame(touchLoopId);
+            loop();
+        }
+
+        function onCameraResults(results) {
+            if (playMode !== 'camera') return;
+
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            
+            if (gameState === 'PLAYING') {
+                drawFruits();
+                
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    const landmarks = results.multiHandLandmarks[0];
+                    const indexFinger = landmarks[8];
+                    
+                    const fingerX = indexFinger.x * canvasElement.width;
+                    const fingerY = indexFinger.y * canvasElement.height;
+
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(fingerX, fingerY, 15, 0, 2 * Math.PI);
+                    canvasCtx.fillStyle = 'rgba(255, 0, 0, 0.85)';
+                    canvasCtx.fill();
+                    canvasCtx.lineWidth = 3;
+                    canvasCtx.strokeStyle = 'white';
+                    canvasCtx.stroke();
+
+                    let hitTargetIndex = -1;
+                    for (let target of fruitTargets) {
+                        let dx = fingerX - target.x;
+                        let dy = fingerY - target.y;
+                        if (Math.sqrt(dx * dx + dy * dy) < target.r) {
+                            hitTargetIndex = target.index;
+                            break;
+                        }
+                    }
+
+                    if (hitTargetIndex !== -1 && !touchCooldown) {
+                        if (currentHoverIndex === hitTargetIndex) {
+                            let holdTime = Date.now() - hoverStartTime;
+                            let progress = Math.min(holdTime / HOLD_DURATION, 1.0);
+                            
+                            let t = fruitTargets.find(obj => obj.index === hitTargetIndex);
+                            drawLoadingRing(t.x, t.y, t.r + 15, progress);
+
+                            if (holdTime >= HOLD_DURATION) {
+                                handleAnswer(hitTargetIndex);
+                            }
+                        } else {
+                            currentHoverIndex = hitTargetIndex;
+                            hoverStartTime = Date.now();
+                        }
+                    } else {
+                        currentHoverIndex = -1;
+                    }
+                } else {
+                    currentHoverIndex = -1;
+                }
+            }
+            canvasCtx.restore();
+        }
+
+        function drawFruits() {
+            if(!activeQuestions[currentQuestionIndex]) return;
+            let q = activeQuestions[currentQuestionIndex];
+            
+            fruitTargets.forEach(target => {
+                let opt = q.options[target.index];
+                
+                // พื้นหลังผลไม้
+                canvasCtx.beginPath();
+                canvasCtx.arc(target.x, target.y, target.r, 0, 2 * Math.PI);
+                canvasCtx.fillStyle = "rgba(255, 255, 255, 0.95)";
+                
+                canvasCtx.shadowColor = "rgba(0, 0, 0, 0.18)";
+                canvasCtx.shadowBlur = 15;
+                canvasCtx.shadowOffsetX = 0;
+                canvasCtx.shadowOffsetY = 8;
+                
+                canvasCtx.fill();
+                
+                canvasCtx.shadowColor = "transparent";
+                canvasCtx.shadowBlur = 0;
+                canvasCtx.shadowOffsetX = 0;
+                canvasCtx.shadowOffsetY = 0;
+
+                canvasCtx.lineWidth = 6;
+                canvasCtx.strokeStyle = "var(--secondary)";
+                
+                if (currentHoverIndex === target.index && playMode === 'camera') {
+                    canvasCtx.strokeStyle = "var(--primary)";
+                }
+                
+                canvasCtx.stroke();
+                
+                // Emoji
+                canvasCtx.font = `${target.r * 0.75}px Arial`;
+                canvasCtx.textAlign = "center";
+                canvasCtx.textBaseline = "middle";
+                canvasCtx.fillText(opt.emoji, target.x, target.y - target.r * 0.25);
+                
+                // เศษส่วน
+                canvasCtx.fillStyle = "#333";
+                canvasCtx.font = `bold ${target.r * 0.45}px Mali`;
+                
+                canvasCtx.fillText(opt.num, target.x + target.r * 0.35, target.y - target.r * 0.15);
+                canvasCtx.fillRect(target.x + target.r * 0.1, target.y + target.r * 0.08, target.r * 0.5, 4);
+                canvasCtx.fillText(opt.den, target.x + target.r * 0.35, target.y + target.r * 0.38);
+            });
+        }
+
+        function drawLoadingRing(x, y, radius, progress) {
+            canvasCtx.beginPath();
+            let startAngle = -Math.PI / 2;
+            let endAngle = startAngle + (2 * Math.PI * progress);
+            
+            canvasCtx.arc(x, y, radius, startAngle, endAngle);
+            canvasCtx.lineWidth = 14;
+            canvasCtx.strokeStyle = 'var(--primary)'; 
+            canvasCtx.lineCap = 'round';
+            canvasCtx.stroke();
+            
+            canvasCtx.fillStyle = 'rgba(76, 175, 80, 0.95)';
+            canvasCtx.font = `bold ${radius * 0.35}px Mali`;
+            canvasCtx.textAlign = 'center';
+            canvasCtx.textBaseline = 'middle';
+            canvasCtx.fillText(`${Math.floor(progress * 100)}%`, x, y);
+        }
+
+        function handleAnswer(selectedIndex) {
+            if (touchCooldown || gameState !== 'PLAYING') return;
+            touchCooldown = true;
+            gameState = 'FEEDBACK';
+            currentHoverIndex = -1; 
+
+            let q = activeQuestions[currentQuestionIndex];
+            let isCorrect = (selectedIndex === q.correctIndex);
+            
+            if (isCorrect) score++;
+
+            const fbStatus = document.getElementById('fb-status');
+            const fbExp = document.getElementById('fb-exp');
+            
+            if (isCorrect) {
+                playCorrectSound();
+                fbStatus.innerText = "ถูกต้อง! 🎉";
+                fbStatus.className = "feedback-status feedback-correct";
+            } else {
+                playWrongSound();
+                fbStatus.innerText = "ยังไม่ถูกจ้า 😅";
+                fbStatus.className = "feedback-status feedback-wrong";
+            }
+            
+            fbExp.innerText = q.explanation;
+            document.getElementById('feedback-screen').classList.remove('hidden');
+
+            const timerBar = document.getElementById('timer-bar');
+            timerBar.style.width = "100%";
+            setTimeout(() => { timerBar.style.width = "0%"; }, 50);
+
+            if (feedbackTimer) clearTimeout(feedbackTimer);
+            feedbackTimer = setTimeout(() => {
+                nextQuestion();
+            }, 5000);
+        }
+
+        function nextQuestion() {
+            if (feedbackTimer) {
+                clearTimeout(feedbackTimer);
+                feedbackTimer = null;
+            }
+            document.getElementById('feedback-screen').classList.add('hidden');
+            currentQuestionIndex++;
+            
+            if (currentQuestionIndex < activeQuestions.length) {
+                loadQuestion();
+            } else {
+                showEndScreen();
+            }
+        }
+
+        function showEndScreen() {
+            gameState = 'END';
+            document.getElementById('game-ui').classList.add('hidden');
+            
+            let percent = (score / activeQuestions.length) * 100;
+            document.getElementById('final-score').innerText = `${score} / ${activeQuestions.length}`;
+            document.getElementById('final-percent').innerText = `คิดเป็นร้อยละ ${percent}`;
+            
+            let msg = "";
+            if (percent >= 80) msg = "ยอดเยี่ยมมาก! หนูเป็นผู้เชี่ยวชาญเรื่องเศษส่วนแล้ว 🌟";
+            else if (percent >= 50) msg = "เก่งมากจ้า! ลองฝึกทบทวนอีกนิดจะเป๊ะเลย 👍";
+            else msg = "ไม่เป็นไรนะ ลองเล่นอีกครั้งเพื่อฝึกฝนทำความเข้าใจ ✌️";
+            
+            document.getElementById('final-message').innerText = msg;
+            document.getElementById('end-screen').classList.remove('hidden');
+        }
+
+        function resetGame() {
+            document.getElementById('end-screen').classList.add('hidden');
+            startGame();
+        }
+
+        // ผูกฟังก์ชันเข้ากับ Global Scope เพื่อความชัวร์ 100% ใน Google Apps Script
+        window.selectMode = selectMode;
+        window.forceTouchMode = forceTouchMode;
+        window.startGame = startGame;
+        window.nextQuestion = nextQuestion;
+        window.resetGame = resetGame;
+        window.backToModeSelect = backToModeSelect;
+    </script>
+</body>
+</html>
